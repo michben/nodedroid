@@ -85,6 +85,8 @@ echo.
 echo Tout est lance. Adresse a saisir sur les telephones :
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /C:"IPv4"') do for /f "tokens=*" %%b in ("%%a") do echo    http://%%b:9601
 echo.
+echo QR code pour configurer un telephone : ouvrez generer-qr.html (meme dossier)
+echo.
 echo Etat du noeud :  "%PARANO1D_DIR%\parano1d-cli.exe" status
 echo Minage       :  "%PARANO1D_DIR%\parano1d-cli.exe" mining
 echo.

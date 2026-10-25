@@ -138,6 +138,24 @@
                 style="@style/Field"
                 android:hint="Adresse de paiement o1… (facultatif)"
                 android:inputType="text" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/scanQr"
+                    style="@style/SmallButton"
+                    android:layout_marginEnd="8dp"
+                    android:text="Scanner un QR code" />
+
+                <Button
+                    android:id="@+id/pasteConfig"
+                    style="@style/SmallButton"
+                    android:text="Coller un lien" />
+            </LinearLayout>
         </LinearLayout>
 
         <CheckBox

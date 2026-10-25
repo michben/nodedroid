@@ -68,6 +68,13 @@ lance le nœud en mode extminer puis le mineur du PC (en priorité basse) et
 affiche l'adresse à saisir sur les téléphones. Pour un lancement automatique,
 placez un raccourci vers ce fichier dans `shell:startup`.
 
+Pour configurer un téléphone en un scan, ouvrez
+[`windows/generer-qr.html`](windows/generer-qr.html) sur le PC (hors ligne) :
+il produit un QR code `paramo1d://miner?rpc=…&key=…&payout=…`. Dans l'app,
+**Scanner un QR code** (lecteur des services Google Play) ou l'appareil photo
+du téléphone l'importent, après confirmation. **Coller un lien** accepte le
+même texte depuis le presse-papiers.
+
 ## Construction
 
 L'APK est construit par GitHub Actions (`.github/workflows/build-apk.yml`) :

@@ -2,6 +2,7 @@ package io.nodedroid.paramo;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -38,6 +39,26 @@ final class MinerConfig {
                 .putString("miner_token", token.trim())
                 .putString("miner_payout", payout.trim())
                 .apply();
+    }
+
+    /**
+     * Lit une configuration partagée par QR code ou lien :
+     * {@code paramo1d://miner?rpc=http%3A%2F%2F192.168.1.20%3A9601&key=…&payout=o1…}.
+     * Retourne null si le texte n'en est pas une.
+     */
+    static MinerConfig fromUri(String text) {
+        if (text == null) return null;
+        Uri uri = Uri.parse(text.trim());
+        if (!"paramo1d".equalsIgnoreCase(uri.getScheme()) || !"miner".equalsIgnoreCase(uri.getHost())) return null;
+        String rpc = uri.getQueryParameter("rpc");
+        if (rpc == null || rpc.trim().isEmpty()) return null;
+        String key = uri.getQueryParameter("key");
+        String payout = uri.getQueryParameter("payout");
+        return new MinerConfig(rpc.trim(), key == null ? "" : key.trim(), payout == null ? "" : payout.trim());
+    }
+
+    void save(Context context) {
+        save(context, rpc, token, payout);
     }
 
     /** Message d'erreur lisible, ou null si la configuration est utilisable. */

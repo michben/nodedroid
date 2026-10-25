@@ -51,3 +51,8 @@ android {
         noCompress += ["pmatrix", "spancache"]
     }
 }
+
+dependencies {
+    // Lecteur de QR code des services Google Play : sans permission caméra, module téléchargé à la demande.
+    implementation "com.google.android.gms:play-services-code-scanner:16.1.0"
+}

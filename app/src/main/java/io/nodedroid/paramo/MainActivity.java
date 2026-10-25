@@ -2,6 +2,9 @@ package io.nodedroid.paramo;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -19,6 +22,10 @@ import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.google.mlkit.vision.barcode.common.Barcode;
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions;
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
 
 import java.util.Locale;
 
@@ -80,11 +87,81 @@ public class MainActivity extends Activity implements VerifierState.Listener {
             return false;
         });
         setupSettings();
+        findViewById(R.id.scanQr).setOnClickListener(view -> scanQr());
+        findViewById(R.id.pasteConfig).setOnClickListener(view -> pasteConfig());
+        handleLink(getIntent());
 
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
         }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleLink(intent);
+    }
+
+    /** Lien paramo1d://miner… ouvert depuis l'appareil photo ou un autre lecteur de QR code. */
+    private void handleLink(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || intent.getData() == null) return;
+        importConfig(intent.getData().toString());
+        intent.setData(null);
+    }
+
+    private void scanQr() {
+        try {
+            GmsBarcodeScannerOptions options = new GmsBarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                    .build();
+            GmsBarcodeScanning.getClient(this, options).startScan()
+                    .addOnSuccessListener(barcode -> importConfig(barcode.getRawValue()))
+                    .addOnFailureListener(error -> Toast.makeText(this,
+                            "Lecteur indisponible : scannez le QR code avec l'appareil photo du téléphone.",
+                            Toast.LENGTH_LONG).show());
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "Lecteur indisponible : scannez le QR code avec l'appareil photo du téléphone.",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void pasteConfig() {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        ClipData clip = clipboard.getPrimaryClip();
+        CharSequence text = clip == null || clip.getItemCount() == 0 ? null : clip.getItemAt(0).coerceToText(this);
+        importConfig(text == null ? null : text.toString());
+    }
+
+    /** Demande confirmation : un lien pourrait envoyer le travail du téléphone vers le nœud de quelqu'un d'autre. */
+    private void importConfig(String text) {
+        MinerConfig config = MinerConfig.fromUri(text);
+        if (config == null) {
+            Toast.makeText(this, "Ce n'est pas une configuration Paramo1d (paramo1d://miner…).", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (VerifierState.running) {
+            Toast.makeText(this, "Arrêtez d'abord la vérification ou le minage.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        String message = "Nœud : " + config.rpc
+                + "\nJeton : " + (config.token.isEmpty() ? "aucun" : "fourni (" + config.token.length() + " caractères)")
+                + "\nPaiement : " + (config.payout.isEmpty() ? "adresse du nœud" : config.payout)
+                + "\n\nN'importez que vos propres QR codes.";
+        new AlertDialog.Builder(this)
+                .setTitle("Importer cette configuration de minage ?")
+                .setMessage(message)
+                .setNegativeButton("Annuler", null)
+                .setPositiveButton("Importer", (dialog, which) -> {
+                    config.save(this);
+                    minerRpc.setText(config.rpc);
+                    minerToken.setText(config.token);
+                    minerPayout.setText(config.payout);
+                    job.check(R.id.jobMine);
+                    Toast.makeText(this, "Configuration importée. Appuyez sur « Démarrer le minage ».", Toast.LENGTH_LONG).show();
+                })
+                .show();
     }
 
     private void setupSettings() {
@@ -200,6 +277,8 @@ public class MainActivity extends Activity implements VerifierState.Listener {
         minerRpc.setEnabled(!running);
         minerToken.setEnabled(!running);
         minerPayout.setEnabled(!running);
+        findViewById(R.id.scanQr).setEnabled(!running);
+        findViewById(R.id.pasteConfig).setEnabled(!running);
         follow.setVisibility(mine ? View.GONE : View.VISIBLE);
         heightLabel.setText(mine ? "blocs trouvés par ce téléphone" : "dernier bloc vérifié");
         height.setText(mine ? String.valueOf(VerifierState.solved) : VerifierState.height);
