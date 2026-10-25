@@ -63,6 +63,11 @@ Le jeton circule en clair en HTTP : restez sur votre réseau local, un VPN
 (WireGuard, Tailscale) ou un proxy TLS. Les mêmes profils de puissance et pauses
 (chaleur, batterie, charge, Wi-Fi) s'appliquent au minage.
 
+Sur Windows, [`windows/demarrer-mineur.bat`](windows/demarrer-mineur.bat)
+lance le nœud en mode extminer puis le mineur du PC (en priorité basse) et
+affiche l'adresse à saisir sur les téléphones. Pour un lancement automatique,
+placez un raccourci vers ce fichier dans `shell:startup`.
+
 ## Construction
 
 L'APK est construit par GitHub Actions (`.github/workflows/build-apk.yml`) :
