@@ -1,0 +1,134 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Client mobile paramo1d et release Parano1d dont il épingle les paramètres.
+  PARAMO1D_REPO: ignotusnemo/paramo1d
+  PARAMO1D_COMMIT: 34baf7fdd70fe83e96ecee6e643365b2261bc213
+  PARANO1D_REPO: ignotusnemo/parano1d
+  PARANO1D_TAG: v2.1.0
+  CARGO_TERM_COLOR: always
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - name: Checkout paramo1d
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PARAMO1D_REPO }}
+          ref: ${{ env.PARAMO1D_COMMIT }}
+          path: paramo1d
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Rust toolchain
+        working-directory: paramo1d
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq clang libclang-dev
+          channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$channel" --profile minimal --target aarch64-linux-android
+          rustc --version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: paramo1d
+
+      - name: Build Android verifier (arm64)
+        working-directory: paramo1d
+        run: |
+          python3 scripts/build-android.py --ndk "$ANDROID_NDK_LATEST_HOME" --cli
+          mkdir -p ../app/src/main/jniLibs/arm64-v8a
+          "$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" \
+            -o ../app/src/main/jniLibs/arm64-v8a/libparamo1d.so \
+            target/aarch64-linux-android/release/paramo1d
+          ls -la ../app/src/main/jniLibs/arm64-v8a
+
+      - name: Build host verifier
+        working-directory: paramo1d
+        run: cargo build --locked --release --bin paramo1d
+
+      - name: Download Parano1d release inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$PARANO1D_TAG" -R "$PARANO1D_REPO" -p 'history-step-pack-*.tar.gz' -D packs
+          ls -la packs
+          mkdir -p release-inputs
+          for archive in packs/history-step-pack-*.tar.gz; do
+            name=$(basename "$archive" .tar.gz)
+            echo "== $name"; tar tzf "$archive" | head -20
+            tmp=$(mktemp -d)
+            tar xzf "$archive" -C "$tmp"
+            entries=("$tmp"/*)
+            if [ ${#entries[@]} -eq 1 ] && [ -d "${entries[0]}" ] && [ "$(basename "${entries[0]}")" = "$name" ]; then
+              mv "${entries[0]}" "release-inputs/$name"
+            else
+              mv "$tmp" "release-inputs/$name"
+            fi
+            rm -f "$archive"
+          done
+          find release-inputs -maxdepth 3 | head -60
+
+      - name: Prepare verification parameters
+        run: |
+          paramo1d/target/release/paramo1d prepare --source release-inputs --artifacts artifacts
+          rm -rf release-inputs
+          ls -la artifacts && du -sh artifacts
+          mkdir -p app/src/main/assets
+          mv artifacts app/src/main/assets/artifacts
+          (cd app/src/main/assets/artifacts && for f in *; do echo "$f $(stat -c %s "$f")"; done) > app/src/main/assets/artifacts.manifest
+          cat app/src/main/assets/artifacts.manifest
+
+      - name: Smoke test on mainnet (host build)
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          PARAMO1D_TERMINAL=1 paramo1d/target/release/paramo1d run \
+            --artifacts app/src/main/assets/artifacts --data-dir smoke-mainnet --once
+          cat smoke-mainnet/accepted.json
+
+      - name: Build APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/Paramo1d-${{ github.run_number }}.apk"
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Paramo1d-apk
+          path: dist/*.apk
+          compression-level: 0
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Paramo1d APK ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: dist/*.apk
+          body: |
+            APK Android (ARM64, Android 8+) du vérificateur Parano1d **paramo1d**.
+            Téléchargez le fichier `.apk` ci-dessous sur votre téléphone, ouvrez-le et autorisez l'installation.

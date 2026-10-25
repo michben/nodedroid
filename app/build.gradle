@@ -1,0 +1,53 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "io.nodedroid.paramo"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "io.nodedroid.paramo"
+        minSdk 26
+        targetSdk 35
+        versionCode (System.getenv("VERSION_CODE") ?: "1") as int
+        versionName "1.0." + (System.getenv("VERSION_CODE") ?: "0")
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    signingConfigs {
+        // Clé fixe versionnée : les nouvelles versions s'installent par-dessus les anciennes.
+        release {
+            storeFile file("nodedroid.keystore")
+            storePassword "nodedroid"
+            keyAlias "nodedroid"
+            keyPassword "nodedroid"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        // Le vérificateur est un exécutable : il doit être extrait sur le disque pour être lancé.
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+
+    androidResources {
+        // Les matrices sont déjà compressées en zstd.
+        noCompress += ["pmatrix", "spancache"]
+    }
+}
