@@ -7,4 +7,31 @@
         <item name="android:navigationBarColor">#0B1412</item>
         <item name="android:windowBackground">#0B1412</item>
     </style>
+
+    <style name="SectionTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">18dp</item>
+        <item name="android:layout_marginBottom">6dp</item>
+        <item name="android:textColor">#8FA8A1</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="Choice">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:buttonTint">#19C29B</item>
+        <item name="android:textColor">#E8F5F1</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="Toggle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:textColor">#E8F5F1</item>
+        <item name="android:textSize">14sp</item>
+    </style>
 </resources>

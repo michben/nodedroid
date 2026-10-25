@@ -1,126 +1,214 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/page"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Paramo1d"
-        android:textColor="#E8F5F1"
-        android:textSize="28sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:text="Vérifiez vous-même la blockchain Parano1d, sans faire confiance à personne."
-        android:textColor="#8FA8A1"
-        android:textSize="14sp" />
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/card"
         android:orientation="vertical"
         android:padding="16dp">
 
         <TextView
-            android:id="@+id/status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Prêt"
-            android:textColor="#19C29B"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/height"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="—"
+            android:text="Paramo1d"
             android:textColor="#E8F5F1"
-            android:textSize="34sp"
+            android:textSize="28sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="dernier bloc vérifié"
+            android:layout_marginBottom="12dp"
+            android:text="Vérifiez vous-même la blockchain Parano1d, sans faire confiance à personne."
             android:textColor="#8FA8A1"
-            android:textSize="12sp" />
+            android:textSize="14sp" />
 
-        <TextView
-            android:id="@+id/details"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:fontFamily="monospace"
-            android:textColor="#B9CEC8"
-            android:textIsSelectable="true"
-            android:textSize="12sp" />
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="16dp">
 
-        <ProgressBar
-            android:id="@+id/progress"
-            style="@android:style/Widget.Material.ProgressBar.Horizontal"
-            android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Prêt"
+                android:textColor="#19C29B"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/height"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="—"
+                android:textColor="#E8F5F1"
+                android:textSize="34sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="dernier bloc vérifié"
+                android:textColor="#8FA8A1"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/details"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:fontFamily="monospace"
+                android:textColor="#B9CEC8"
+                android:textIsSelectable="true"
+                android:textSize="12sp" />
+
+            <ProgressBar
+                android:id="@+id/progress"
+                style="@android:style/Widget.Material.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:indeterminate="true"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/follow"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:buttonTint="#19C29B"
+            android:checked="true"
+            android:text="Continuer à suivre les nouveaux blocs"
+            android:textColor="#E8F5F1" />
+
+        <Button
+            android:id="@+id/action"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
             android:layout_marginTop="8dp"
-            android:indeterminate="true"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <CheckBox
-        android:id="@+id/follow"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:buttonTint="#19C29B"
-        android:checked="true"
-        android:text="Continuer à suivre les nouveaux blocs"
-        android:textColor="#E8F5F1" />
-
-    <Button
-        android:id="@+id/action"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/button"
-        android:text="Démarrer la vérification"
-        android:textAllCaps="false"
-        android:textColor="#0B1412"
-        android:textSize="17sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:layout_marginBottom="4dp"
-        android:text="Journal"
-        android:textColor="#8FA8A1"
-        android:textSize="12sp" />
-
-    <ScrollView
-        android:id="@+id/logScroll"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="@drawable/card"
-        android:padding="10dp">
+            android:background="@drawable/button"
+            android:text="Démarrer la vérification"
+            android:textAllCaps="false"
+            android:textColor="#0B1412"
+            android:textSize="17sp"
+            android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/log"
+            style="@style/SectionTitle"
+            android:text="Appareil détecté" />
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:textColor="#B9CEC8"
-            android:textIsSelectable="true"
-            android:textSize="11sp" />
-    </ScrollView>
-</LinearLayout>
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/device"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#E8F5F1"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/profile"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="#19C29B"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/conditions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="#8FA8A1"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/SectionTitle"
+            android:text="Réglages" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="Puissance"
+                android:textColor="#8FA8A1"
+                android:textSize="12sp" />
+
+            <RadioGroup
+                android:id="@+id/mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <RadioButton android:id="@+id/modeAuto" style="@style/Choice" />
+                <RadioButton android:id="@+id/modeEco" style="@style/Choice" />
+                <RadioButton android:id="@+id/modeBalanced" style="@style/Choice" />
+                <RadioButton android:id="@+id/modePerformance" style="@style/Choice" />
+            </RadioGroup>
+
+            <Switch
+                android:id="@+id/heatGuard"
+                style="@style/Toggle"
+                android:text="Pause si le téléphone chauffe" />
+
+            <Switch
+                android:id="@+id/batteryGuard"
+                style="@style/Toggle"
+                android:text="Pause si batterie sous 20 % (hors charge)" />
+
+            <Switch
+                android:id="@+id/chargingOnly"
+                style="@style/Toggle"
+                android:text="Uniquement pendant la charge" />
+
+            <Switch
+                android:id="@+id/wifiOnly"
+                style="@style/Toggle"
+                android:text="Uniquement en Wi-Fi" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/SectionTitle"
+            android:text="Journal" />
+
+        <ScrollView
+            android:id="@+id/logScroll"
+            android:layout_width="match_parent"
+            android:layout_height="320dp"
+            android:background="@drawable/card"
+            android:padding="10dp">
+
+            <TextView
+                android:id="@+id/log"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="#B9CEC8"
+                android:textIsSelectable="true"
+                android:textSize="11sp" />
+        </ScrollView>
+    </LinearLayout>
+</ScrollView>

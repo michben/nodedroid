@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +39,8 @@ public class VerifierService extends Service {
 
     private static final String CHANNEL = "verifier";
     private static final int NOTIFICATION_ID = 1;
+    /** Délai minimal avant de changer le nombre de cœurs de soi-même (une relance resynchronise). */
+    private static final long RETUNE_DELAY_MS = 5 * 60 * 1000;
     private static final Pattern ANSI = Pattern.compile("\u001B\\[[0-9;]*[A-Za-z]");
     private static final Pattern SYNCED = Pattern.compile("SYNCED\\s+MAINNET\\s+·\\s+BLOCK\\s+(\\d+)");
     private static final Pattern HEADERS = Pattern.compile("HEADERS\\s+(\\d+)/(\\d+)");
@@ -45,6 +48,8 @@ public class VerifierService extends Service {
     private static final Pattern COMPATIBLE = Pattern.compile("Compatible peers:\\s+(\\d+)");
 
     private Thread worker;
+    private volatile boolean workerLimitHit;
+    private boolean ignoreThreadLimit;
     private volatile Process process;
     private volatile boolean stopping;
     private PowerManager.WakeLock wakeLock;
@@ -211,34 +216,118 @@ public class VerifierService extends Service {
         if (!binary.isFile()) throw new IOException("vérificateur natif absent de l'APK");
         File data = dataDir(this);
         if (!data.isDirectory() && !data.mkdirs()) throw new IOException("impossible de créer " + data);
-        // Les candidats d'une session précédente interrompue ne sont jamais réutilisés.
-        File[] leftovers = data.listFiles((dir, name) -> name.startsWith("candidate-"));
-        if (leftovers != null) for (File leftover : leftovers) deleteRecursively(leftover);
 
-        List<String> command = new ArrayList<>();
-        command.add(binary.getAbsolutePath());
-        command.add("run");
-        command.add("--artifacts");
-        command.add(artifactsDir(this).getAbsolutePath());
-        command.add("--data-dir");
-        command.add(data.getAbsolutePath());
-        if (!follow) command.add("--once");
-        ProcessBuilder builder = new ProcessBuilder(command)
-                .directory(getFilesDir())
-                .redirectErrorStream(true);
-        builder.environment().put("PARAMO1D_TERMINAL", "1");
-        builder.environment().put("TMPDIR", getCacheDir().getAbsolutePath());
-        setStatus("Chargement des paramètres…");
-        process = builder.start();
-        readOutput(process.getInputStream());
-        int code = process.waitFor();
-        process = null;
-        if (stopping) return;
-        if (code == 0) {
-            setStatus("Synchronisé ✔");
-        } else {
-            setStatus("Le vérificateur s'est arrêté (code " + code + ")");
+        // Superviseur : relance le client quand l'appareil le permet, avec le nombre de cœurs adapté.
+        while (!stopping) {
+            DeviceProfile.Decision decision = evaluate();
+            if (decision.paused()) {
+                VerifierState.busy = false;
+                setStatus("En pause : " + decision.pauseReason);
+                waitSeconds(10);
+                continue;
+            }
+            // Les candidats d'une session précédente interrompue ne sont jamais réutilisés.
+            File[] leftovers = data.listFiles((dir, name) -> name.startsWith("candidate-"));
+            if (leftovers != null) for (File leftover : leftovers) deleteRecursively(leftover);
+
+            int threads = decision.threads;
+            List<String> command = new ArrayList<>();
+            command.add(binary.getAbsolutePath());
+            if (!ignoreThreadLimit) {
+                command.add("--threads");
+                command.add(String.valueOf(threads));
+            }
+            command.add("run");
+            command.add("--artifacts");
+            command.add(artifactsDir(this).getAbsolutePath());
+            command.add("--data-dir");
+            command.add(data.getAbsolutePath());
+            if (!follow) command.add("--once");
+            ProcessBuilder builder = new ProcessBuilder(command)
+                    .directory(getFilesDir())
+                    .redirectErrorStream(true);
+            builder.environment().put("PARAMO1D_TERMINAL", "1");
+            builder.environment().put("TMPDIR", getCacheDir().getAbsolutePath());
+            VerifierState.busy = true;
+            VerifierState.log(String.format(Locale.FRANCE, "PROFIL     %s · %d cœurs", decision.profile, threads));
+            setStatus("Chargement des paramètres…");
+            Process running = builder.start();
+            process = running;
+            Thread reader = new Thread(() -> {
+                try {
+                    readOutput(running.getInputStream());
+                } catch (IOException ignored) {
+                    // Flux fermé à l'arrêt du processus.
+                }
+            }, "paramo1d-output");
+            reader.start();
+
+            long started = System.currentTimeMillis();
+            boolean restart = false;
+            while (!running.waitFor(10, TimeUnit.SECONDS)) {
+                if (stopping) break;
+                DeviceProfile.Decision now = evaluate();
+                if (now.paused()) {
+                    VerifierState.log("PAUSE      " + now.pauseReason);
+                    restart = true;
+                } else if (now.threads != threads && !VerifierState.busy
+                        && (VerifierState.settingsChanged || System.currentTimeMillis() - started > RETUNE_DELAY_MS)) {
+                    VerifierState.log(String.format(Locale.FRANCE, "PROFIL     passage à %d cœurs (%s)", now.threads, now.profile));
+                    restart = true;
+                }
+                if (restart || now.threads == threads) VerifierState.settingsChanged = false;
+                if (restart) {
+                    running.destroy();
+                    break;
+                }
+            }
+            running.waitFor();
+            reader.join(2000);
+            process = null;
+            if (stopping) return;
+            if (restart) continue;
+            int code = running.exitValue();
+            if (code != 0 && workerLimitHit && !ignoreThreadLimit) {
+                // Le système expose moins de cœurs au processus que prévu : on laisse le client choisir.
+                VerifierState.log("PROFIL     nombre de cœurs refusé, choix automatique du client");
+                ignoreThreadLimit = true;
+                continue;
+            }
+            if (code == 0) {
+                setStatus("Synchronisé ✔");
+            } else {
+                setStatus("Le vérificateur s'est arrêté (code " + code + ")");
+            }
+            return;
         }
+    }
+
+    private DeviceProfile.Decision evaluate() {
+        DeviceProfile.Conditions conditions = DeviceProfile.conditions(this);
+        DeviceProfile.Decision decision = DeviceProfile.decide(this, conditions);
+        VerifierState.profile = decision.paused()
+                ? "En pause"
+                : String.format(Locale.FRANCE, "%s · %d cœurs", decision.profile, decision.threads);
+        VerifierState.conditions = describe(conditions);
+        VerifierState.changed();
+        return decision;
+    }
+
+    static String describe(DeviceProfile.Conditions conditions) {
+        StringBuilder text = new StringBuilder(String.format(Locale.FRANCE, "Batterie %d %%", conditions.batteryPercent));
+        if (conditions.charging) text.append(" ⚡");
+        if (!Float.isNaN(conditions.batteryTemperature)) {
+            text.append(String.format(Locale.FRANCE, " · %.0f °C", conditions.batteryTemperature));
+        }
+        text.append(conditions.connected ? (conditions.unmetered ? " · Wi-Fi" : " · données mobiles") : " · hors ligne");
+        return text.toString();
+    }
+
+    private void waitSeconds(int seconds) throws InterruptedException {
+        for (int i = 0; i < seconds && !stopping && !VerifierState.settingsChanged; i++) {
+            Thread.sleep(1000);
+        }
+        VerifierState.settingsChanged = false;
     }
 
     /** Lit la sortie du client : les lignes terminées par \r sont des barres de progression. */
@@ -263,6 +352,7 @@ public class VerifierService extends Service {
 
     private void handleLine(String text, boolean transient_) {
         Matcher matcher;
+        if (text.contains("worker count must be")) workerLimitHit = true;
         if ((matcher = HEADERS.matcher(text)).find()) {
             VerifierState.progress = "En-têtes  " + matcher.group(1) + " / " + matcher.group(2);
             if (!transient_) VerifierState.log(text);

@@ -19,6 +19,25 @@ puis affiche le dernier bloc vérifié, la racine d'État, la durée et la mémo
 Avec « Continuer à suivre les nouveaux blocs », elle reste active en arrière-plan
 (notification avec bouton **Arrêter**) et vérifie chaque nouveau bloc.
 
+## Réglages selon l'appareil
+
+L'app détecte le téléphone (modèle, puce, nombre de cœurs et cœurs performants,
+RAM) et propose quatre profils :
+
+| Profil | Cœurs utilisés (ex. realme GT Neo2, 8 cœurs dont 4 performants) |
+| --- | --- |
+| Économie | moitié des cœurs performants (2) |
+| Équilibré | cœurs performants (4) |
+| Performance | tous les cœurs (8) |
+| Automatique | Performance en charge, Équilibré sur batterie, Économie si batterie < 40 % ou si le téléphone tiède |
+
+Le nombre de cœurs est plafonné sur les téléphones à 3–4 Go de RAM. Pendant la
+vérification, l'app surveille la batterie, la température et le réseau toutes
+les 10 secondes : elle se met en pause si le téléphone chauffe (batterie ≥ 45 °C
+ou alerte thermique d'Android), si la batterie passe sous 20 % hors charge, et
+en option hors charge ou hors Wi-Fi, puis reprend seule. Un changement de nombre
+de cœurs est appliqué entre deux blocs.
+
 Prérequis : téléphone ARM64 sous Android 8.0 ou plus récent, connexion Internet.
 
 ## Construction

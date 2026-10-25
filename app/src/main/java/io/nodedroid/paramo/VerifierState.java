@@ -26,6 +26,10 @@ final class VerifierState {
     static volatile String memory = "";
     static volatile String peers = "";
     static volatile String progress = "";
+    static volatile String profile = "";
+    static volatile String conditions = "";
+    /** Les réglages viennent de changer : le service les applique sans attendre. */
+    static volatile boolean settingsChanged;
 
     private static final ArrayDeque<String> LOG = new ArrayDeque<>();
 
