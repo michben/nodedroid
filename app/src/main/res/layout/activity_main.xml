@@ -28,6 +28,28 @@
             android:textColor="#8FA8A1"
             android:textSize="14sp" />
 
+        <RadioGroup
+            android:id="@+id/job"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/jobVerify"
+                style="@style/Choice"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="Vérifier" />
+
+            <RadioButton
+                android:id="@+id/jobMine"
+                style="@style/Choice"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="Miner" />
+        </RadioGroup>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -55,6 +77,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/heightLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="dernier bloc vérifié"
@@ -79,6 +102,42 @@
                 android:layout_marginTop="8dp"
                 android:indeterminate="true"
                 android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/minerPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Le téléphone cherche le nonce des blocs. Un nœud Parano1d en mode extminer (PC ou serveur) ou un pool prépare les preuves : plusieurs téléphones peuvent se connecter au même nœud."
+                android:textColor="#8FA8A1"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/minerRpc"
+                style="@style/Field"
+                android:hint="Adresse du nœud ou du pool (http://192.168.1.20:9601)"
+                android:inputType="textUri" />
+
+            <EditText
+                android:id="@+id/minerToken"
+                style="@style/Field"
+                android:hint="Jeton de minage (mining.key)"
+                android:inputType="textPassword" />
+
+            <EditText
+                android:id="@+id/minerPayout"
+                style="@style/Field"
+                android:hint="Adresse de paiement o1… (facultatif)"
+                android:inputType="text" />
         </LinearLayout>
 
         <CheckBox

@@ -31,6 +31,13 @@ final class VerifierState {
     /** Les réglages viennent de changer : le service les applique sans attendre. */
     static volatile boolean settingsChanged;
 
+    // Minage : compteurs de la session en cours.
+    static volatile boolean mining;
+    static volatile int templates;
+    static volatile int solved;
+    static volatile int stale;
+    static volatile int expired;
+
     private static final ArrayDeque<String> LOG = new ArrayDeque<>();
 
     private VerifierState() {}
@@ -54,8 +61,24 @@ final class VerifierState {
         LOG.clear();
     }
 
-    static String details() {
+    static void resetMining() {
+        templates = 0;
+        solved = 0;
+        stale = 0;
+        expired = 0;
+        peers = "";
+        progress = "";
+    }
+
+    static String details(boolean mining) {
         StringBuilder text = new StringBuilder();
+        if (mining) {
+            if (templates > 0) text.append("Gabarits ").append(templates).append(" · périmés ").append(stale)
+                    .append(" · expirés ").append(expired).append('\n');
+            if (!peers.isEmpty()) text.append("Calcul   ").append(peers).append('\n');
+            if (!progress.isEmpty()) text.append(progress).append('\n');
+            return text.toString().trim();
+        }
         if (!stateRoot.isEmpty()) text.append("State  ").append(abbreviate(stateRoot)).append('\n');
         if (!timing.isEmpty()) text.append("Durée  ").append(timing).append('\n');
         if (!memory.isEmpty()) text.append("RAM    ").append(memory).append('\n');

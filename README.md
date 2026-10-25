@@ -40,6 +40,29 @@ de cœurs est appliqué entre deux blocs.
 
 Prérequis : téléphone ARM64 sous Android 8.0 ou plus récent, connexion Internet.
 
+## Minage avec un ou plusieurs téléphones
+
+L'onglet **Miner** fait du téléphone un chercheur de nonce (`parano1d-miner`).
+Dans Parano1d, un bloc doit d'abord être prouvé par un nœud complet qui détient
+l'État ; ce travail de preuve est trop lourd pour un téléphone (≈ 17 s sur 12 cœurs,
+plusieurs Go de RAM). Il faut donc **un nœud en mode extminer** (PC ou serveur)
+ou un pool, auquel autant de téléphones que voulu se connectent :
+
+```sh
+umask 077
+openssl rand -hex 32 > ~/.parano1d/mining.key
+parano1d --mode extminer --rpc-listen 0.0.0.0:9601 \
+  --mining-key-file ~/.parano1d/mining.key
+# facultatif : laisser chaque téléphone choisir son adresse de paiement
+#   --allow-custom-coinbase
+```
+
+Dans l'app, renseignez l'adresse du nœud (`http://IP-du-PC:9601`), le contenu
+de `mining.key` et, si le nœud l'autorise, une adresse de paiement `o1…`.
+Le jeton circule en clair en HTTP : restez sur votre réseau local, un VPN
+(WireGuard, Tailscale) ou un proxy TLS. Les mêmes profils de puissance et pauses
+(chaleur, batterie, charge, Wi-Fi) s'appliquent au minage.
+
 ## Construction
 
 L'APK est construit par GitHub Actions (`.github/workflows/build-apk.yml`) :

@@ -11,12 +11,14 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.Locale;
 
@@ -31,6 +33,12 @@ public class MainActivity extends Activity implements VerifierState.Listener {
     private Button action;
     private TextView profile;
     private TextView conditions;
+    private TextView heightLabel;
+    private RadioGroup job;
+    private View minerPanel;
+    private EditText minerRpc;
+    private EditText minerToken;
+    private EditText minerPayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,6 +55,22 @@ public class MainActivity extends Activity implements VerifierState.Listener {
 
         profile = findViewById(R.id.profile);
         conditions = findViewById(R.id.conditions);
+        heightLabel = findViewById(R.id.heightLabel);
+        job = findViewById(R.id.job);
+        minerPanel = findViewById(R.id.minerPanel);
+        minerRpc = findViewById(R.id.minerRpc);
+        minerToken = findViewById(R.id.minerToken);
+        minerPayout = findViewById(R.id.minerPayout);
+
+        MinerConfig saved = MinerConfig.load(this);
+        minerRpc.setText(saved.rpc);
+        minerToken.setText(saved.token);
+        minerPayout.setText(saved.payout);
+        job.check("mine".equals(DeviceProfile.prefs(this).getString("job", "verify")) ? R.id.jobMine : R.id.jobVerify);
+        job.setOnCheckedChangeListener((group, id) -> {
+            DeviceProfile.prefs(this).edit().putString("job", id == R.id.jobMine ? "mine" : "verify").apply();
+            onStateChanged();
+        });
 
         if (!VerifierState.running) VerifierService.loadAccepted(this);
         action.setOnClickListener(view -> toggle());
@@ -131,8 +155,19 @@ public class MainActivity extends Activity implements VerifierState.Listener {
             intent.setAction(VerifierService.ACTION_STOP);
             startService(intent);
         } else {
+            boolean mine = job.getCheckedRadioButtonId() == R.id.jobMine;
+            if (mine) {
+                MinerConfig.save(this, minerRpc.getText().toString(), minerToken.getText().toString(),
+                        minerPayout.getText().toString());
+                String problem = MinerConfig.load(this).problem();
+                if (problem != null) {
+                    Toast.makeText(this, "Minage : " + problem, Toast.LENGTH_LONG).show();
+                    return;
+                }
+            }
             intent.setAction(VerifierService.ACTION_START);
             intent.putExtra(VerifierService.EXTRA_FOLLOW, follow.isChecked());
+            intent.putExtra(VerifierService.EXTRA_MINE, mine);
             startForegroundService(intent);
         }
     }
@@ -158,13 +193,22 @@ public class MainActivity extends Activity implements VerifierState.Listener {
         String current = VerifierState.status;
         status.setTextColor(current.startsWith("Erreur") || current.startsWith("Le vérificateur") ? 0xFFFF7A7A
                 : current.startsWith("En pause") ? 0xFFE8B04A : 0xFF19C29B);
-        height.setText(VerifierState.height);
-        String text = VerifierState.details();
+        boolean mine = running ? VerifierState.mining : job.getCheckedRadioButtonId() == R.id.jobMine;
+        if (running) job.check(mine ? R.id.jobMine : R.id.jobVerify);
+        for (int i = 0; i < job.getChildCount(); i++) job.getChildAt(i).setEnabled(!running);
+        minerPanel.setVisibility(mine ? View.VISIBLE : View.GONE);
+        minerRpc.setEnabled(!running);
+        minerToken.setEnabled(!running);
+        minerPayout.setEnabled(!running);
+        follow.setVisibility(mine ? View.GONE : View.VISIBLE);
+        heightLabel.setText(mine ? "blocs trouvés par ce téléphone" : "dernier bloc vérifié");
+        height.setText(mine ? String.valueOf(VerifierState.solved) : VerifierState.height);
+        String text = VerifierState.details(mine);
         details.setText(text);
         details.setVisibility(text.isEmpty() ? View.GONE : View.VISIBLE);
         progress.setVisibility(running && VerifierState.busy ? View.VISIBLE : View.GONE);
         follow.setEnabled(!running);
-        action.setText(running ? "Arrêter" : "Démarrer la vérification");
+        action.setText(running ? "Arrêter" : mine ? "Démarrer le minage" : "Démarrer la vérification");
         action.setBackgroundResource(running ? R.drawable.button_stop : R.drawable.button);
         action.setTextColor(running ? 0xFFFFFFFF : 0xFF0B1412);
 

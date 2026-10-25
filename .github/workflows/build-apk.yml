@@ -34,6 +34,13 @@ jobs:
           ref: ${{ env.PARAMO1D_COMMIT }}
           path: paramo1d
 
+      - name: Checkout Parano1d (external miner)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PARANO1D_REPO }}
+          ref: ${{ env.PARANO1D_TAG }}
+          path: parano1d
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -49,7 +56,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: paramo1d
+          workspaces: |
+            paramo1d
+            parano1d
 
       - name: Build Android verifier (arm64)
         working-directory: paramo1d
@@ -59,6 +68,20 @@ jobs:
           "$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" \
             -o ../app/src/main/jniLibs/arm64-v8a/libparamo1d.so \
             target/aarch64-linux-android/release/paramo1d
+          ls -la ../app/src/main/jniLibs/arm64-v8a
+
+      - name: Build Android nonce miner (arm64)
+        working-directory: parano1d
+        run: |
+          channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$channel" --profile minimal --target aarch64-linux-android
+          toolchain="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$toolchain/bin/aarch64-linux-android26-clang"
+          export CC_aarch64_linux_android="$toolchain/bin/aarch64-linux-android26-clang"
+          export AR_aarch64_linux_android="$toolchain/bin/llvm-ar"
+          cargo build --locked --release --target aarch64-linux-android -p noid-extminer --bin parano1d-miner
+          "$toolchain/bin/llvm-strip" -o ../app/src/main/jniLibs/arm64-v8a/libparano1d_miner.so \
+            target/aarch64-linux-android/release/parano1d-miner
           ls -la ../app/src/main/jniLibs/arm64-v8a
 
       - name: Build host verifier

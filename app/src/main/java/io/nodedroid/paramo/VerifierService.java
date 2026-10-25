@@ -36,6 +36,7 @@ public class VerifierService extends Service {
     static final String ACTION_START = "io.nodedroid.paramo.START";
     static final String ACTION_STOP = "io.nodedroid.paramo.STOP";
     static final String EXTRA_FOLLOW = "follow";
+    static final String EXTRA_MINE = "mine";
 
     private static final String CHANNEL = "verifier";
     private static final int NOTIFICATION_ID = 1;
@@ -46,10 +47,12 @@ public class VerifierService extends Service {
     private static final Pattern HEADERS = Pattern.compile("HEADERS\\s+(\\d+)/(\\d+)");
     private static final Pattern DOWNLOAD = Pattern.compile("DOWNLOAD\\s+Mainnet block\\s+(\\d+)");
     private static final Pattern COMPATIBLE = Pattern.compile("Compatible peers:\\s+(\\d+)");
+    private static final Pattern TEMPLATE = Pattern.compile("h=(\\d+)\\s+txs=(\\d+).*diff=(\\d+)");
 
     private Thread worker;
     private volatile boolean workerLimitHit;
     private boolean ignoreThreadLimit;
+    private volatile boolean mining;
     private volatile Process process;
     private volatile boolean stopping;
     private PowerManager.WakeLock wakeLock;
@@ -101,6 +104,9 @@ public class VerifierService extends Service {
         }
         if (worker != null && worker.isAlive()) return START_NOT_STICKY;
         boolean follow = intent == null || intent.getBooleanExtra(EXTRA_FOLLOW, true);
+        mining = intent != null && intent.getBooleanExtra(EXTRA_MINE, false);
+        VerifierState.mining = mining;
+        if (mining) VerifierState.resetMining();
         startInForeground("Démarrage…");
         PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
         wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "paramo1d:verifier");
@@ -118,7 +124,7 @@ public class VerifierService extends Service {
 
     private void work(boolean follow) {
         try {
-            installArtifacts();
+            if (!mining) installArtifacts();
             if (!stopping) runVerifier(follow);
         } catch (Exception error) {
             if (!stopping) {
@@ -212,8 +218,13 @@ public class VerifierService extends Service {
     }
 
     private void runVerifier(boolean follow) throws IOException, InterruptedException {
-        File binary = new File(getApplicationInfo().nativeLibraryDir, "libparamo1d.so");
-        if (!binary.isFile()) throw new IOException("vérificateur natif absent de l'APK");
+        File binary = new File(getApplicationInfo().nativeLibraryDir, mining ? "libparano1d_miner.so" : "libparamo1d.so");
+        if (!binary.isFile()) throw new IOException((mining ? "mineur" : "vérificateur") + " natif absent de l'APK");
+        MinerConfig miner = mining ? MinerConfig.load(this) : null;
+        if (miner != null) {
+            String problem = miner.problem();
+            if (problem != null) throw new IOException(problem);
+        }
         File data = dataDir(this);
         if (!data.isDirectory() && !data.mkdirs()) throw new IOException("impossible de créer " + data);
 
@@ -233,16 +244,20 @@ public class VerifierService extends Service {
             int threads = decision.threads;
             List<String> command = new ArrayList<>();
             command.add(binary.getAbsolutePath());
-            if (!ignoreThreadLimit) {
-                command.add("--threads");
-                command.add(String.valueOf(threads));
+            if (miner != null) {
+                command.addAll(miner.arguments(this, threads));
+            } else {
+                if (!ignoreThreadLimit) {
+                    command.add("--threads");
+                    command.add(String.valueOf(threads));
+                }
+                command.add("run");
+                command.add("--artifacts");
+                command.add(artifactsDir(this).getAbsolutePath());
+                command.add("--data-dir");
+                command.add(data.getAbsolutePath());
+                if (!follow) command.add("--once");
             }
-            command.add("run");
-            command.add("--artifacts");
-            command.add(artifactsDir(this).getAbsolutePath());
-            command.add("--data-dir");
-            command.add(data.getAbsolutePath());
-            if (!follow) command.add("--once");
             ProcessBuilder builder = new ProcessBuilder(command)
                     .directory(getFilesDir())
                     .redirectErrorStream(true);
@@ -250,7 +265,7 @@ public class VerifierService extends Service {
             builder.environment().put("TMPDIR", getCacheDir().getAbsolutePath());
             VerifierState.busy = true;
             VerifierState.log(String.format(Locale.FRANCE, "PROFIL     %s · %d cœurs", decision.profile, threads));
-            setStatus("Chargement des paramètres…");
+            setStatus(mining ? "Connexion au nœud…" : "Chargement des paramètres…");
             Process running = builder.start();
             process = running;
             Thread reader = new Thread(() -> {
@@ -270,7 +285,7 @@ public class VerifierService extends Service {
                 if (now.paused()) {
                     VerifierState.log("PAUSE      " + now.pauseReason);
                     restart = true;
-                } else if (now.threads != threads && !VerifierState.busy
+                } else if (now.threads != threads && (mining || !VerifierState.busy)
                         && (VerifierState.settingsChanged || System.currentTimeMillis() - started > RETUNE_DELAY_MS)) {
                     VerifierState.log(String.format(Locale.FRANCE, "PROFIL     passage à %d cœurs (%s)", now.threads, now.profile));
                     restart = true;
@@ -293,7 +308,9 @@ public class VerifierService extends Service {
                 ignoreThreadLimit = true;
                 continue;
             }
-            if (code == 0) {
+            if (mining) {
+                if (!VerifierState.status.startsWith("Erreur")) setStatus("Le mineur s'est arrêté (code " + code + ")");
+            } else if (code == 0) {
                 setStatus("Synchronisé ✔");
             } else {
                 setStatus("Le vérificateur s'est arrêté (code " + code + ")");
@@ -353,6 +370,10 @@ public class VerifierService extends Service {
     private void handleLine(String text, boolean transient_) {
         Matcher matcher;
         if (text.contains("worker count must be")) workerLimitHit = true;
+        if (mining) {
+            handleMinerLine(text);
+            return;
+        }
         if ((matcher = HEADERS.matcher(text)).find()) {
             VerifierState.progress = "En-têtes  " + matcher.group(1) + " / " + matcher.group(2);
             if (!transient_) VerifierState.log(text);
@@ -391,6 +412,35 @@ public class VerifierService extends Service {
         VerifierState.changed();
     }
 
+    /** Sortie de parano1d-miner : un gabarit prouvé par le nœud, puis SOLVED, STALE ou EXPIRED. */
+    private void handleMinerLine(String text) {
+        VerifierState.log(text);
+        Matcher matcher;
+        if ((matcher = TEMPLATE.matcher(text)).find()) {
+            VerifierState.templates++;
+            VerifierState.progress = "Bloc     " + formatHeight(Long.parseLong(matcher.group(1)))
+                    + " · difficulté " + matcher.group(3) + " bits · " + matcher.group(2) + " tx";
+            setStatus("Recherche du nonce…");
+        } else if (text.contains("SOLVED")) {
+            VerifierState.solved++;
+            setStatus("Bloc trouvé ✔ (" + VerifierState.solved + ")");
+        } else if (text.contains("STALE")) {
+            VerifierState.stale++;
+        } else if (text.contains("EXPIRED")) {
+            VerifierState.expired++;
+        } else if (text.startsWith("template fetch failed")) {
+            setStatus(text.contains("401") ? "Erreur : jeton refusé par le nœud (401)" : "Nœud injoignable, nouvel essai…");
+        } else if (text.startsWith("fatal:")) {
+            setStatus("Erreur : " + text.substring(6).trim());
+        } else if (text.startsWith("Connecting")) {
+            setStatus("Connexion au nœud…");
+        } else if (text.startsWith("parano1d-miner")) {
+            int backend = text.indexOf("backend=");
+            if (backend >= 0) VerifierState.peers = text.substring(backend + 8).split("\\s+")[0];
+        }
+        VerifierState.changed();
+    }
+
     private void setStatus(String status) {
         VerifierState.status = status;
         VerifierState.changed();
@@ -423,7 +473,8 @@ public class VerifierService extends Service {
                 new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
         PendingIntent stop = PendingIntent.getService(this, 1,
                 new Intent(this, VerifierService.class).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE);
-        String title = VerifierState.height.equals("—") ? "Paramo1d" : "Paramo1d · bloc " + VerifierState.height;
+        String title = mining ? "Paramo1d · minage · " + VerifierState.solved + " bloc(s) trouvé(s)"
+                : VerifierState.height.equals("—") ? "Paramo1d" : "Paramo1d · bloc " + VerifierState.height;
         String body = VerifierState.progress.isEmpty() ? text : text + "  ·  " + VerifierState.progress;
         return new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_stat)

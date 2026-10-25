@@ -34,4 +34,16 @@
         <item name="android:textColor">#E8F5F1</item>
         <item name="android:textSize">14sp</item>
     </style>
+
+    <style name="Field">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:textColor">#E8F5F1</item>
+        <item name="android:textColorHint">#5F7A73</item>
+        <item name="android:backgroundTint">#19C29B</item>
+        <item name="android:textSize">14sp</item>
+    </style>
 </resources>
